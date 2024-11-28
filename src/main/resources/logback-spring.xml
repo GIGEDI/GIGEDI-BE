@@ -1,0 +1,22 @@
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/base.xml"/>
+
+    <springProfile name="dev">
+        <root level="INFO">
+            <appender-ref ref="SENTRY"/>
+        </root>
+
+        <logger name="org.springframework.web" level="ERROR">
+            <appender-ref ref="SENTRY" />
+        </logger>
+    </springProfile>
+
+    <appender name="SENTRY" class="io.sentry.logback.SentryAppender">
+        <filter class="ch.qos.logback.core.filter.EvaluatorFilter">
+            <evaluator class="ch.qos.logback.classic.boolex.OnErrorEvaluator" />
+            <OnMismatch>DENY</OnMismatch>
+            <OnMatch>ACCEPT</OnMatch>
+        </filter>
+    </appender>
+
+</configuration>

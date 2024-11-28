@@ -1,21 +1,18 @@
 plugins {
 	id 'java'
-	id 'org.springframework.boot' version '3.3.4'
-	id 'io.spring.dependency-management' version '1.1.6'
+	id 'org.springframework.boot' version "${springBootVersion}"
+	id 'io.spring.dependency-management' version "${springDependencyManagementVersion}"
+	id 'jacoco'
+	id 'org.sonarqube' version "${sonarVersion}"
+	id 'com.diffplug.spotless' version "${spotlessVersion}"
 }
 
-group = 'gigedi'
-version = '0.0.1-SNAPSHOT'
+group = "${projectGroup}"
+version = "${applicationVersion}"
 
 java {
 	toolchain {
-		languageVersion = JavaLanguageVersion.of(17)
-	}
-}
-
-configurations {
-	compileOnly {
-		extendsFrom annotationProcessor
+		languageVersion = JavaLanguageVersion.of(javaVersion)
 	}
 }
 
@@ -26,13 +23,162 @@ repositories {
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation "jakarta.persistence:jakarta.persistence-api:${jakartaPersistenceVersion}"
+	implementation "org.springdoc:springdoc-openapi-starter-webmvc-ui:${springdocVersion}"
+	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+	// QueryDSL
+	implementation "com.querydsl:querydsl-jpa:${querydslVersion}:jakarta"
+	implementation "com.querydsl:querydsl-apt:${querydslVersion}:jakarta"
+	annotationProcessor "com.querydsl:querydsl-apt:${querydslVersion}:jakarta"
+	annotationProcessor "jakarta.annotation:jakarta.annotation-api"
+	annotationProcessor "jakarta.persistence:jakarta.persistence-api"
+
 	compileOnly 'org.projectlombok:lombok'
-	runtimeOnly 'com.mysql:mysql-connector-j'
 	annotationProcessor 'org.projectlombok:lombok'
-	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+	runtimeOnly 'com.mysql:mysql-connector-j'
+
+	// JWT
+	implementation "io.jsonwebtoken:jjwt-api:${jwtVersion}"
+	runtimeOnly "io.jsonwebtoken:jjwt-impl:${jwtVersion}"
+	runtimeOnly "io.jsonwebtoken:jjwt-jackson:${jwtVersion}"
+
+	// Sentry
+	implementation "io.sentry:sentry-spring-boot-starter:${sentryVersion}"
+	implementation "io.sentry:sentry-logback:${sentryVersion}"
+
+	// Spring Security
+	implementation 'org.springframework.boot:spring-boot-starter-security'
+	implementation 'org.springframework.security:spring-security-test'
+	implementation 'org.springframework.security:spring-security-oauth2-client'
+	implementation 'org.springframework.security:spring-security-oauth2-jose'
+
+
+	// Testing
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testRuntimeOnly 'com.h2database:h2'
+
+	implementation 'org.apache.httpcomponents.client5:httpclient5:5.2.1'
+}
+
+def jacocoDir = layout.buildDirectory.dir("reports/")
+def QDomains = []
+for (qPattern in '*.QA'..'*.QZ') {
+	QDomains.add(qPattern + '*')
+}
+
+def jacocoExcludePatterns = [
+		"**/*Application*",
+		"**/*Config*",
+		"**/*Exception*",
+		"**/*Request*",
+		"**/*Response*",
+		"**/*Dto*",
+		"**/*Interceptor*",
+		"**/*Filter*",
+		"**/*Resolver*",
+		"**/*Entity*",
+		"**/*Error*/**",
+		"**/test/**",
+		"**/global/**",
+		"**/resources/**"
+]
+
+jacoco {
+	toolVersion = "${jacocoToolVersion}"
+}
+
+jacocoTestReport {
+	dependsOn test
+	reports {
+		html.required.set(true)
+		xml.required.set(true)
+		csv.required.set(true)
+		html.outputLocation = jacocoDir.get().file("jacoco/index.html").asFile
+		xml.outputLocation = jacocoDir.get().file("jacoco/index.xml").asFile
+		csv.outputLocation = jacocoDir.get().file("jacoco/index.csv").asFile
+	}
+	afterEvaluate {
+		classDirectories.setFrom(
+				files(classDirectories.files.collect {
+					fileTree(dir: it, excludes: jacocoExcludePatterns + QDomains)
+				})
+		)
+	}
+	finalizedBy jacocoTestCoverageVerification
+}
+
+jacocoTestCoverageVerification {
+	violationRules {
+		rule {
+			enabled = true
+			element = 'CLASS'
+			excludes = jacocoExcludePatterns + QDomains
+		}
+	}
+}
+
+sonar {
+	properties {
+		property "sonar.projectKey", "GIGEDI_GIGEDI-BE"
+		property "sonar.organization", "gigedi"
+		property "sonar.host.url", "https://sonarcloud.io"
+		property 'sonar.sources', 'src'
+		property 'sonar.language', 'java'
+		property 'sonar.sourceEncoding', 'UTF-8'
+		property 'sonar.test.exclusions', jacocoExcludePatterns.join(',')
+		property 'sonar.test.inclusions', '**/*Test.java'
+		property 'sonar.java.coveragePlugin', 'jacoco'
+		property 'sonar.coverage.jacoco.xmlReportPaths', jacocoDir.get().file("jacoco/index.xml").asFile
+	}
+}
+
+spotless {
+	java {
+		googleJavaFormat().aosp()
+		importOrder("java", "javax", "jakarta", "org", "com")
+		removeUnusedImports()
+		trimTrailingWhitespace()
+		endWithNewline()
+		targetExclude("src/main/generated/**/*.java")
+	}
 }
 
 tasks.named('test') {
 	useJUnitPlatform()
+	finalizedBy 'jacocoTestReport'
+}
+
+tasks.register("updateGitHooks", Copy) {
+	from(file("${rootProject.rootDir}/scripts/pre-commit"))
+	into(file("${rootProject.rootDir}/.git/hooks"))
+}
+
+tasks.register('makeGitHooksExecutable', Exec) {
+	if (System.getProperty("os.name").contains("Windows")) {
+		commandLine("attrib", "+x", "${rootProject.rootDir}/.git/hooks/pre-commit")
+	} else {
+		commandLine("chmod", "+x", "${rootProject.rootDir}/.git/hooks/pre-commit")
+	}
+	dependsOn("updateGitHooks")
+}
+
+tasks.withType(JavaCompile) {
+	dependsOn("makeGitHooksExecutable")
+}
+
+def querydslDir = 'src/main/generated'
+
+sourceSets {
+	main.java.srcDirs += [ querydslDir ]
+}
+
+tasks.withType(JavaCompile) {
+	options.annotationProcessorGeneratedSourcesDirectory = file(querydslDir)
+}
+
+clean {
+	delete file(querydslDir)
 }

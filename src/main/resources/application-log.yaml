@@ -1,0 +1,14 @@
+spring:
+  config:
+    activate:
+      on-profile: "log"
+
+sentry:
+  dsn: ${SENTRY_DSN}
+  enable: true
+  environment: ${SENTRY_ENV}
+  traces-sample-rate: 1.0
+  logging:
+    exception-resolver-order: -2147483647
+    minimum-event-level: error
+    minimum-breadcrumb-level: info

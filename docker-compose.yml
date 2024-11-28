@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  backend:
+    image: ${IMAGE_FULL_URL}
+    container_name: ${DOCKERHUB_IMAGE_NAME}
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - TZ=Asia/Seoul
+    env_file:
+      - .env
+  redis:
+    image: "redis:alpine"
+    container_name: redis
+    ports:
+      - "6379:6379"
+    environment:
+      - TZ=Asia/Seoul

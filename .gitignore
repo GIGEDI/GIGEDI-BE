@@ -18,6 +18,8 @@ bin/
 !**/src/test/**/bin/
 
 ### IntelliJ IDEA ###
+.DS_Store
+.env
 .idea
 *.iws
 *.iml
@@ -35,3 +37,6 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### Querydsl ###
+/src/main/generated/
