@@ -14,9 +14,9 @@ public class WebConfig implements WebMvcConfigurer {
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
                 .allowedOriginPatterns(
-                        "http://localhost:5173",
+                        "https://shoot-manage.com",
                         "https://www.figma.com/**",
-                        "https://shoot-manage.com/**")
+                        "https://shoot-manage.com")
                 .allowedMethods("GET", "POST", "PATCH", "DELETE")
                 .allowedHeaders("*")
                 .allowCredentials(true)
